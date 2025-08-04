@@ -19,10 +19,69 @@ class MonteCarloAgent:
         self.episode_rewards = []  # Track performance
     
     def get_state_key(self, grid: np.ndarray, shapes: List[int]) -> str:
-        """Convert state to string key for Q-table"""
-        grid_str = ''.join(map(str, grid.flatten()))
-        shapes_str = ','.join(map(str, sorted(shapes)))
-        return f"{grid_str}|{shapes_str}"
+        """Convert state to string key - simplified for better generalization"""
+        # Use grid density and structure patterns
+        row_densities = [np.sum(grid[i, :]) for i in range(10)]
+        col_densities = [np.sum(grid[:, j]) for j in range(10)]
+        
+        # Add structural features
+        holes = self._count_holes(grid)
+        edges = self._count_edge_blocks(grid)
+        islands = self._count_isolated_regions(grid)
+        
+        state_features = (
+            tuple(row_densities),
+            tuple(col_densities), 
+            holes,
+            edges,
+            islands,
+            tuple(sorted(shapes))
+        )
+        
+        return str(hash(state_features))
+    
+    def _count_holes(self, grid: np.ndarray) -> int:
+        """Count isolated empty spaces that are hard to fill"""
+        holes = 0
+        for i in range(1, 9):  # Skip edges
+            for j in range(1, 9):
+                if grid[i, j] == 0:
+                    # Check if surrounded by filled cells
+                    neighbors = [
+                        grid[i-1, j], grid[i+1, j], 
+                        grid[i, j-1], grid[i, j+1]
+                    ]
+                    if sum(neighbors) >= 3:  # Mostly surrounded
+                        holes += 1
+        return holes
+    
+    def _count_edge_blocks(self, grid: np.ndarray) -> int:
+        """Count blocks on edges (generally good for line clearing)"""
+        edges = np.sum(grid[0, :]) + np.sum(grid[9, :])  # Top and bottom
+        edges += np.sum(grid[:, 0]) + np.sum(grid[:, 9])  # Left and right
+        return edges
+    
+    def _count_isolated_regions(self, grid: np.ndarray) -> int:
+        """Count separate empty regions"""
+        visited = np.zeros_like(grid, dtype=bool)
+        regions = 0
+        
+        def dfs(i, j):
+            if i < 0 or i >= 10 or j < 0 or j >= 10 or visited[i, j] or grid[i, j] == 1:
+                return
+            visited[i, j] = True
+            dfs(i+1, j)
+            dfs(i-1, j)
+            dfs(i, j+1)
+            dfs(i, j-1)
+        
+        for i in range(10):
+            for j in range(10):
+                if grid[i, j] == 0 and not visited[i, j]:
+                    dfs(i, j)
+                    regions += 1
+        
+        return regions
 
     def get_action_key(self, state_key: str, action: Tuple) -> str:
         """Convert state-action pair to string key"""
