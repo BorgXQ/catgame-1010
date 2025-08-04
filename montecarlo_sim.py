@@ -24,7 +24,7 @@ class MonteCarloAgent:
     def get_action_key(self, state_key: str, action: Tuple) -> str:
         """Convert state-action pair to string key"""
         return f"{state_key}#{action}"
-    
+
     def choose_action(self, game: TenTenGame, available_shapes: List[int], training=True) -> Optional[Tuple]:
         """Choose action using epsilon-greedy policy"""
         valid_actions = []
@@ -115,3 +115,27 @@ class MonteCarloAgent:
         # Decay exploration rate
         self.exploration_rate *= 0.995
         print(f"Training completed. Final exploration rate: {self.exploration_rate:.3f}")
+    
+    def get_best_sequence(self, game: TenTenGame, available_shapes: List[int]) -> List[Tuple]:
+        """Get the best sequence of moves for given shapes"""
+        best_sequence = []
+        temp_game = TenTenGame()
+        temp_game.grid = game.grid.copy()
+        temp_game.score = game.score
+        
+        remaining_shapes = available_shapes.copy()
+        
+        while remaining_shapes:
+            action = self.choose_action(temp_game, remaining_shapes, training=False)
+            
+            if action is None:
+                break
+            
+            shape_id, row, col, _ = action
+            best_sequence.append((shape_id, row, col))
+            
+            temp_game.place_shape(shape_id, row, col)
+            remaining_shapes.remove(shape_id)
+        
+        return best_sequence
+    
