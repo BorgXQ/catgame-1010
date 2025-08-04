@@ -240,7 +240,7 @@ class MonteCarloAgent:
                 game_reward, game_over = game.place_shape(shape_id, row, col)
                 
                 # Calculate advanced reward
-                strategic_reward = self.calculate_advanced_reward(game, prev_grid, action)
+                strategic_reward = self.calculate_reward(game, prev_grid, action)
                 total_reward_step = game_reward + strategic_reward
                 
                 total_reward += total_reward_step
@@ -343,7 +343,7 @@ class MonteCarloAgent:
                 sequence.append((shape_id_action, row, col))
                 
                 game_reward, game_over = temp_game.place_shape(shape_id_action, row, col)
-                strategic_reward = self.calculate_advanced_reward(temp_game, prev_grid, action)
+                strategic_reward = self.calculate_reward(temp_game, prev_grid, action)
                 total_reward += game_reward + strategic_reward
                 
                 if game_over:
