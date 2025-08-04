@@ -158,7 +158,7 @@ class MonteCarloAgent:
         return total_reward
 
     def choose_action(self, game, available_shapes: List[int], training=True) -> Optional[Tuple]:
-        """Action selection"""
+        """Improved action selection with better exploration"""
         valid_actions = []
         
         # Generate all possible actions
@@ -173,24 +173,40 @@ class MonteCarloAgent:
         state_key = self.get_state_key(game.get_state(), available_shapes)
         
         if training:
-            # Epsilon-greedy with decay
+            # Simple epsilon-greedy exploration
             if random.random() < self.exploration_rate:
                 return random.choice(valid_actions)
             
-            # Boltzmann exploration
+            # Softmax exploration with temperature control
             if len(valid_actions) > 1:
-                temperatures = []
+                q_values = []
                 for action in valid_actions:
                     action_key = f"{state_key}#{action}"
                     q_value = self.q_table[action_key]
-                    temperatures.append(q_value)
+                    q_values.append(q_value)
                 
-                # Convert to probabilities
-                if max(temperatures) > min(temperatures):
-                    temperatures = np.array(temperatures)
-                    temperatures = np.exp(temperatures / 0.1)  # Temperature parameter
-                    probabilities = temperatures / np.sum(temperatures)
-                    return np.random.choice(valid_actions, p=probabilities)
+                # Use softmax with temperature control to prevent overflow
+                q_values = np.array(q_values)
+                
+                # Normalize to prevent overflow
+                q_max = np.max(q_values)
+                q_values = q_values - q_max
+                
+                # Apply temperature and softmax
+                temperature = 1.0
+                exp_values = np.exp(q_values / temperature)
+                probabilities = exp_values / np.sum(exp_values)
+                
+                # Handle NaN values
+                if np.any(np.isnan(probabilities)):
+                    return random.choice(valid_actions)
+                
+                # Use numpy choice correctly
+                try:
+                    choice_idx = np.random.choice(len(valid_actions), p=probabilities)
+                    return valid_actions[choice_idx]
+                except (ValueError, TypeError):
+                    return random.choice(valid_actions)
         
         # Choose best action
         best_action = None
