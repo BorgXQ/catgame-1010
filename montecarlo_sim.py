@@ -85,78 +85,99 @@ class MonteCarloAgent:
 
     def calculate_reward(self, game, prev_grid: np.ndarray, action: Tuple) -> float:
         """Calculate reward"""
-        shape_id, row, col = action[:3]
-        current_grid = game.get_state()
-        
-        # Base reward from line clearing
-        lines_cleared_reward = game.score - np.sum(prev_grid)  # Score increase
-        
-        # Penalize creating holes and isolated spaces
-        prev_holes = self._count_holes(prev_grid)
-        curr_holes = self._count_holes(current_grid)
-        hole_penalty = (curr_holes - prev_holes) * -10
-        
-        # Reward edge placement (helps with line clearing)
-        edge_bonus = 0
-        shape_coords = game.shapes[shape_id]
-        for dr, dc in shape_coords:
-            pos_r, pos_c = row + dr, col + dc
-            if pos_r == 0 or pos_r == 9 or pos_c == 0 or pos_c == 9:
-                edge_bonus += 2
-        
-        # Reward completing rows/columns or getting close
-        completion_bonus = 0
-        for i in range(10):
-            row_filled = np.sum(current_grid[i, :])
-            col_filled = np.sum(current_grid[:, i])
+        try:
+            shape_id, row, col = action[:3]
+            current_grid = game.get_state()
             
-            # Big bonus for completing lines
-            if row_filled == 10:
-                completion_bonus += 50
-            elif row_filled >= 8:  # Close to completion
-                completion_bonus += row_filled * 2
+            # Base reward from line clearing
+            prev_score = np.sum(prev_grid)
+            curr_score = game.score
+            lines_cleared_reward = max(0, curr_score - prev_score)  # Ensure non-negative
+            
+            # Penalize creating holes and isolated spaces
+            prev_holes = self._count_holes(prev_grid)
+            curr_holes = self._count_holes(current_grid)
+            hole_penalty = max(-50, (curr_holes - prev_holes) * -10)  # Cap penalty
+            
+            # Reward edge placement (helps with line clearing)
+            edge_bonus = 0
+            if shape_id in game.shapes:
+                shape_coords = game.shapes[shape_id]
+                for dr, dc in shape_coords:
+                    pos_r, pos_c = row + dr, col + dc
+                    if 0 <= pos_r < 10 and 0 <= pos_c < 10:  # Safety check
+                        if pos_r == 0 or pos_r == 9 or pos_c == 0 or pos_c == 9:
+                            edge_bonus += 2
+            
+            # Reward completing rows/columns or getting close
+            completion_bonus = 0
+            for i in range(10):
+                row_filled = np.sum(current_grid[i, :])
+                col_filled = np.sum(current_grid[:, i])
                 
-            if col_filled == 10:
-                completion_bonus += 50
-            elif col_filled >= 8:
-                completion_bonus += col_filled * 2
-        
-        # Penalize fragmentation
-        prev_regions = self._count_isolated_regions(prev_grid)
-        curr_regions = self._count_isolated_regions(current_grid)
-        fragmentation_penalty = (curr_regions - prev_regions) * -5
-        
-        # Height penalty - prefer keeping pieces low
-        height_penalty = 0
-        for dr, dc in shape_coords:
-            pos_r = row + dr
-            height_penalty += (9 - pos_r) * -0.5  # Slight penalty for height
-        
-        # Density bonus - reward placing pieces in denser areas
-        density_bonus = 0
-        for dr, dc in shape_coords:
-            pos_r, pos_c = row + dr, col + dc
-            # Count neighbors
-            neighbors = 0
-            for di in [-1, 0, 1]:
-                for dj in [-1, 0, 1]:
-                    ni, nj = pos_r + di, pos_c + dj
-                    if 0 <= ni < 10 and 0 <= nj < 10 and prev_grid[ni, nj] == 1:
-                        neighbors += 1
-            density_bonus += neighbors * 0.5
-        
-        total_reward = (
-            lines_cleared_reward * 3 +  # Primary objective
-            completion_bonus +
-            edge_bonus +
-            hole_penalty +
-            fragmentation_penalty +
-            height_penalty +
-            density_bonus
-        )
-        
-        return total_reward
-
+                # Big bonus for completing lines
+                if row_filled == 10:
+                    completion_bonus += 50
+                elif row_filled >= 8:  # Close to completion
+                    completion_bonus += min(20, row_filled * 2)  # Cap bonus
+                    
+                if col_filled == 10:
+                    completion_bonus += 50
+                elif col_filled >= 8:
+                    completion_bonus += min(20, col_filled * 2)  # Cap bonus
+            
+            # Penalize fragmentation
+            try:
+                prev_regions = self._count_isolated_regions(prev_grid)
+                curr_regions = self._count_isolated_regions(current_grid)
+                fragmentation_penalty = max(-25, (curr_regions - prev_regions) * -5)
+            except:
+                fragmentation_penalty = 0
+            
+            # Height penalty - prefer keeping pieces low
+            height_penalty = 0
+            if shape_id in game.shapes:
+                shape_coords = game.shapes[shape_id]
+                for dr, dc in shape_coords:
+                    pos_r = row + dr
+                    if 0 <= pos_r < 10:  # Safety check
+                        height_penalty += (9 - pos_r) * -0.5  # Slight penalty for height
+            
+            # Density bonus - reward placing pieces in denser areas
+            density_bonus = 0
+            if shape_id in game.shapes:
+                shape_coords = game.shapes[shape_id]
+                for dr, dc in shape_coords:
+                    pos_r, pos_c = row + dr, col + dc
+                    if 0 <= pos_r < 10 and 0 <= pos_c < 10:  # Safety check
+                        # Count neighbors
+                        neighbors = 0
+                        for di in [-1, 0, 1]:
+                            for dj in [-1, 0, 1]:
+                                ni, nj = pos_r + di, pos_c + dj
+                                if 0 <= ni < 10 and 0 <= nj < 10 and prev_grid[ni, nj] == 1:
+                                    neighbors += 1
+                        density_bonus += min(5, neighbors * 0.5)  # Cap bonus
+            
+            total_reward = (
+                lines_cleared_reward * 3 +  # Primary objective
+                completion_bonus +
+                edge_bonus +
+                hole_penalty +
+                fragmentation_penalty +
+                height_penalty +
+                density_bonus
+            )
+            
+            # Cap total reward to prevent extreme values
+            total_reward = max(-200, min(200, total_reward))
+            
+            return total_reward
+            
+        except Exception as e:
+            # Return 0 if any error occurs in reward calculation
+            return 0
+    
     def choose_action(self, game, available_shapes: List[int], training=True) -> Optional[Tuple]:
         """Improved action selection with better exploration"""
         valid_actions = []
