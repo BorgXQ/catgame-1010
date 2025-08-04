@@ -156,12 +156,12 @@ class MonteCarloAgent:
         )
         
         return total_reward
-    
-    def choose_action(self, game: TenTenGame, available_shapes: List[int], training=True) -> Optional[Tuple]:
-        """Choose action using epsilon-greedy policy"""
+
+    def choose_action(self, game, available_shapes: List[int], training=True) -> Optional[Tuple]:
+        """Action selection"""
         valid_actions = []
         
-        # Generate all possible actions (shape_id, position, order_index)
+        # Generate all possible actions
         for order_idx, shape_id in enumerate(available_shapes):
             positions = game.get_valid_placements(shape_id)
             for pos in positions:
@@ -170,16 +170,34 @@ class MonteCarloAgent:
         if not valid_actions:
             return None
         
-        if training and random.random() < self.exploration_rate:
-            return random.choice(valid_actions)
-        
-        # Choose best action based on Q-values
         state_key = self.get_state_key(game.get_state(), available_shapes)
+        
+        if training:
+            # Epsilon-greedy with decay
+            if random.random() < self.exploration_rate:
+                return random.choice(valid_actions)
+            
+            # Boltzmann exploration
+            if len(valid_actions) > 1:
+                temperatures = []
+                for action in valid_actions:
+                    action_key = f"{state_key}#{action}"
+                    q_value = self.q_table[action_key]
+                    temperatures.append(q_value)
+                
+                # Convert to probabilities
+                if max(temperatures) > min(temperatures):
+                    temperatures = np.array(temperatures)
+                    temperatures = np.exp(temperatures / 0.1)  # Temperature parameter
+                    probabilities = temperatures / np.sum(temperatures)
+                    return np.random.choice(valid_actions, p=probabilities)
+        
+        # Choose best action
         best_action = None
         best_value = float('-inf')
         
         for action in valid_actions:
-            action_key = self.get_action_key(state_key, action)
+            action_key = f"{state_key}#{action}"
             q_value = self.q_table[action_key]
             if q_value > best_value:
                 best_value = q_value
