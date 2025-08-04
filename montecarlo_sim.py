@@ -1,5 +1,6 @@
 import numpy as np
 import random
+import json
 from collections import defaultdict
 from typing import List, Tuple, Optional
 from game_environment import TenTenGame
@@ -115,7 +116,7 @@ class MonteCarloAgent:
         # Decay exploration rate
         self.exploration_rate *= 0.995
         print(f"Training completed. Final exploration rate: {self.exploration_rate:.3f}")
-    
+
     def get_best_sequence(self, game: TenTenGame, available_shapes: List[int]) -> List[Tuple]:
         """Get the best sequence of moves for given shapes"""
         best_sequence = []
@@ -139,3 +140,21 @@ class MonteCarloAgent:
         
         return best_sequence
     
+    def save_model(self, filename: str):
+        """Save trained model"""
+        model_data = {
+            'q_table': dict(self.q_table),
+            'exploration_rate': self.exploration_rate,
+            'episodes_trained': self.episodes_trained
+        }
+        with open(filename, 'w') as f:
+            json.dump(model_data, f)
+    
+    def load_model(self, filename: str):
+        """Load trained model"""
+        with open(filename, 'r') as f:
+            model_data = json.load(f)
+        
+        self.q_table = defaultdict(float, model_data['q_table'])
+        self.exploration_rate = model_data['exploration_rate']
+        self.episodes_trained = model_data['episodes_trained']
