@@ -3,6 +3,7 @@ from tkinter import messagebox
 from game_environment import TenTenGame
 from montecarlo_sim import MonteCarloAgent
 
+
 class TenTenGUI:
     """Game GUI Interface"""
     
