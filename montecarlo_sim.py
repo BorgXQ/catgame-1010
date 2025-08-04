@@ -9,12 +9,14 @@ from game_environment import TenTenGame
 class MonteCarloAgent:
     """Monte Carlo-based RL Agent"""
     
-    def __init__(self, exploration_rate=0.3, learning_rate=0.1):
+    def __init__(self, exploration_rate=0.3, learning_rate=0.1, discount_factor=0.95):
         self.q_table = defaultdict(float)
         self.returns = defaultdict(list)
         self.exploration_rate = exploration_rate
         self.learning_rate = learning_rate
+        self.discount_factor = discount_factor
         self.episodes_trained = 0
+        self.episode_rewards = []  # Track performance
     
     def get_state_key(self, grid: np.ndarray, shapes: List[int]) -> str:
         """Convert state to string key for Q-table"""
