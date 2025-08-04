@@ -136,7 +136,7 @@ class TenTenGUI:
             if not sequence:
                 self.result_text.insert(tk.END, "No valid moves available!\n")
             
-            # Simulate the moves to show expected outcome
+            # Simulate moves to show expected outcome
             temp_game = TenTenGame()
             temp_game.grid = self.game.grid.copy()
             total_reward = 0
@@ -171,10 +171,10 @@ class TenTenGUI:
         """Run the GUI application"""
         self.root.mainloop()
 
-# Example usage and training script
+
 if __name__ == "__main__":
-    # Option 1: Run the GUI interface
-    print("Starting 1010! RL Solver GUI...")
+    # Option 1: Run GUI interface
+    print("Starting interface...")
     gui = TenTenGUI()
     gui.run()
     
