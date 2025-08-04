@@ -222,7 +222,7 @@ class MonteCarloAgent:
         return best_action if best_action else random.choice(valid_actions)
     
     def train_episode(self, game) -> int:
-        """Train on a single episode with improved reward calculation"""
+        """Train on a single episode with reward calculation"""
         episode_history = []
         game.reset()
         total_reward = 0
@@ -236,38 +236,45 @@ class MonteCarloAgent:
             if game.is_game_over(available_shapes):
                 break
             
-            # Play all 3 shapes with better reward tracking
+            # Play all 3 shapes with reward tracking
             remaining_shapes = available_shapes.copy()
-            round_states = []
             
             while remaining_shapes and steps < max_steps:
                 prev_grid = game.get_state().copy()
                 prev_score = game.score
                 
-                action = self.choose_action(game, remaining_shapes, training=True)
-                if action is None:
-                    break
-                
-                shape_id, row, col, _ = action
-                state_key = self.get_state_key(prev_grid, remaining_shapes)
-                action_key = f"{state_key}#{action}"
-                
-                # Execute action
-                game_reward, game_over = game.place_shape(shape_id, row, col)
-                
-                # Calculate advanced reward
-                strategic_reward = self.calculate_reward(game, prev_grid, action)
-                total_reward_step = game_reward + strategic_reward
-                
-                total_reward += total_reward_step
-                episode_history.append((action_key, total_reward_step))
-                
-                remaining_shapes.remove(shape_id)
-                steps += 1
-                
-                if game_over:
-                    # Heavy penalty for game over
-                    episode_history.append((action_key, -100))
+                try:
+                    action = self.choose_action(game, remaining_shapes, training=True)
+                    if action is None:
+                        break
+                    
+                    shape_id, row, col, _ = action
+                    state_key = self.get_state_key(prev_grid, remaining_shapes)
+                    action_key = f"{state_key}#{action}"
+                    
+                    # Execute action
+                    game_reward, game_over = game.place_shape(shape_id, row, col)
+                    
+                    # Calculate reward
+                    try:
+                        strategic_reward = self.calculate_reward(game, prev_grid, action)
+                    except Exception as e:
+                        strategic_reward = 0  # Fallback to avoid crashes
+                    
+                    total_reward_step = game_reward + strategic_reward
+                    total_reward += total_reward_step
+                    episode_history.append((action_key, total_reward_step))
+                    
+                    remaining_shapes.remove(shape_id)
+                    steps += 1
+                    
+                    if game_over:
+                        # Heavy penalty for game over
+                        episode_history.append((action_key, -100))
+                        break
+                        
+                except Exception as e:
+                    print(f"Warning: Error in training step: {e}")
                     break
         
         # Update Q-values using discounted returns
@@ -283,7 +290,11 @@ class MonteCarloAgent:
             # Use incremental mean for better stability
             old_avg = self.q_table[action_key]
             n = len(self.returns[action_key])
-            self.q_table[action_key] = old_avg + (G - old_avg) / n
+            new_avg = old_avg + (G - old_avg) / n
+            
+            # Prevent extreme values
+            new_avg = max(-1000, min(1000, new_avg))
+            self.q_table[action_key] = new_avg
         
         self.episodes_trained += 1
         self.episode_rewards.append(total_reward)
